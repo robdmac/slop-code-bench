@@ -170,6 +170,17 @@ class AgentRunSpec(BaseModel):
             description="Whether to skip evaluation and force all checkpoints to run."
         ),
     ] = False
+    defer_evaluation: Annotated[
+        bool,
+        Field(
+            description="Solve every checkpoint first, then evaluate the saved "
+            "snapshots afterward (off the inter-checkpoint critical path). "
+            "Eval results never feed the agent, so scores are unchanged for "
+            "the ANY_CASE pass policy. Trade-off: cannot early-stop on test "
+            "failures (results are unavailable until after solving); agent "
+            "errors and rate limits still stop the run."
+        ),
+    ] = False
     verbose: Annotated[
         bool, Field(description="Whether to print verbose output")
     ] = False
