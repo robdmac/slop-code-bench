@@ -117,7 +117,7 @@ class RunConfig(BaseModel):
     # ${agent.version}, ${prompt}, ${thinking}, ${env.name}, ${now:FORMAT}
     # Note: ${agent.version} is cleanly omitted if the agent has no version
     save_dir: str = "outputs"
-    save_template: str = "${model.name}/${agent.type}-${agent.version}_${prompt}_${thinking}_${now:%Y%m%dT%H%M}"
+    save_template: str = "${model.name}/${agent.type}-${agent.version}_${prompt}_${thinking}_${now:%Y%m%dT%H%M%S%f}"
 
     def get_thinking_preset(self) -> ThinkingPresetType | None:
         """Get the thinking preset value, handling both string and object forms."""

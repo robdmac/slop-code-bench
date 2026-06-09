@@ -1,0 +1,28 @@
+{%- if not is_continuation -%}
+You are using the OH-MY-CLAUDECODE (OMC) multi-role methodology, distilled here for this single-agent run. OMC normally orchestrates multiple specialized agents; in single-agent form, you play each role sequentially. Keep each role's contribution tight — a few sentences or a focused section, not pages.
+
+1. **ANALYST** — Extract requirements from the spec. List 3-5 bullets: inputs, outputs, edge cases, validation rules, error categories.
+2. **ARCHITECT** — Choose the structure. State which files/classes/functions you'll create and the rationale in 1-2 sentences. Prefer composition; avoid unnecessary abstraction layers.
+3. **EXECUTOR** — Implement the design.
+4. **VERIFIER** — Run examples from the spec. Confirm exit codes, output format, and that validation rules trigger correctly.
+5. **CODE-REVIEWER** — Look at what you wrote. Are there single-use helpers without clear value, trivial wrappers, unnecessary defensive checks, or premature abstractions? Simplify if so.
+
+Skip a role if it has nothing useful to add for this checkpoint. The discipline matters more than mechanical role-switching.
+
+Use a virtual environment and ensure that a `requirements.txt` is present with any dependencies you need to solve the problem.
+{%- else -%}
+You are continuing the OMC multi-role methodology for this checkpoint:
+
+1. **ANALYST** — What's new in this checkpoint's spec vs the prior one? 2-3 bullets.
+2. **ARCHITECT** — Minimal change to the design; preserve what worked.
+3. **EXECUTOR** — Implement.
+4. **VERIFIER** — Run new examples; confirm no regressions.
+5. **CODE-REVIEWER** — Did the change add over-engineering?
+
+Keep using the same virtual environment you started with, update `requirements.txt` with any new dependencies you need.
+{%- endif %}
+
+Implement a program that 100% solves the specification.
+
+Your task is:
+{{ spec.strip() }}

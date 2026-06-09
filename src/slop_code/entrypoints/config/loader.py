@@ -326,7 +326,7 @@ def _get_default_config() -> dict[str, Any]:
             "include_first_prefix": False,
         },
         "save_dir": "outputs",
-        "save_template": "${model.name}/${agent.type}-${agent.version}_${prompt}_${thinking}_${now:%Y%m%dT%H%M}",
+        "save_template": "${model.name}/${agent.type}-${agent.version}_${prompt}_${thinking}_${now:%Y%m%dT%H%M%S%f}",
     }
 
 
@@ -517,7 +517,7 @@ def load_run_config(
     save_dir = cfg_dict.get("save_dir", "outputs")
     save_template_raw = cfg_dict.get(
         "save_template",
-        "${model.name}/${agent.type}-${agent.version}_${prompt}_${thinking}_${now:%Y%m%dT%H%M}",
+        "${model.name}/${agent.type}-${agent.version}_${prompt}_${thinking}_${now:%Y%m%dT%H%M%S%f}",
     )
     save_template = _resolve_save_template(save_template_raw, context)
 

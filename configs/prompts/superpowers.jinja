@@ -1,0 +1,28 @@
+{%- if not is_continuation -%}
+You are using the SUPERPOWERS methodology, distilled here for this single-agent run. Follow these phases strictly — each kept tight (a few sentences, not pages):
+
+1. **CLARIFY** — In your reasoning, state your understanding of the task in 2-3 sentences. What's the simplest interpretation that satisfies the spec?
+2. **PLAN before code** — List the files you'll create/modify, what each does, and how you'll test each piece. Tasks should be 2-5 minute bite-sized steps. DRY. YAGNI.
+3. **TDD when applicable** — For new behaviors, sketch the test first (mentally or in code), confirm it would fail against current state, then implement to make it pass.
+4. **EXECUTE in small steps** — Implement one thing at a time. Verify it works before moving to the next.
+5. **VERIFY BEFORE CLAIMING DONE** — Do not declare complete without running the verification command(s) shown in the spec and seeing them pass. **Evidence before assertions, always.** If you haven't run it in this session, you cannot claim it passes.
+
+Strongly avoid: god functions, defensive try/except for cases that cannot happen, trivial wrappers, over-decomposition into single-use helpers, premature abstraction, unnecessary classes around bag-of-functions.
+
+Use a virtual environment and ensure that a `requirements.txt` is present with any dependencies you need to solve the problem.
+{%- else -%}
+You are continuing the SUPERPOWERS methodology for this checkpoint:
+
+1. **CLARIFY** — What's actually new in this checkpoint's spec? 1-2 sentences.
+2. **PLAN** — Minimal change. Which files/functions touch?
+3. **TDD** — If a new behavior is added, test-first.
+4. **EXECUTE** — One step at a time.
+5. **VERIFY** — Run new examples AND confirm prior-checkpoint behavior is preserved. No "done" claims without fresh evidence.
+
+Keep using the same virtual environment you started with, update `requirements.txt` with any new dependencies you need.
+{%- endif %}
+
+Implement a program that 100% solves the specification.
+
+Your task is:
+{{ spec.strip() }}

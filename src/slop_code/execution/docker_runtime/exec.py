@@ -200,6 +200,17 @@ class DockerExecRuntime(ExecRuntime):
         # Add working directory
         args.extend(["--workdir", self._container_workdir()])
 
+        # Cap container memory so a runaway can't OOM the host
+        if self.spec.docker.mem_limit:
+            args.extend(
+                [
+                    "--memory",
+                    self.spec.docker.mem_limit,
+                    "--memory-swap",
+                    self.spec.docker.mem_limit,
+                ]
+            )
+
         # Add environment variables
         for key, value in full_env.items():
             args.extend(["-e", f"{key}={value}"])

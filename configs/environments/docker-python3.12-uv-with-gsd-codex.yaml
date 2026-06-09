@@ -1,10 +1,13 @@
 type: docker
-name: python3.12
+name: python3.12-with-gsd-codex
 docker:
   image: ghcr.io/astral-sh/uv:python3.12-trixie-slim
   workdir: /workspace
   mount_workspace: true
   mem_limit: 12g
+  extra_mounts:
+    # GSD doesn't use Codex skill format. Mount the framework for the agent to consult.
+    /home/rob/swebench/solution/skill/get-shit-done: /tmp/agent_home/.gsd
 environment:
   env:
     UV_CACHE_DIR: /tmp/uv-cache
@@ -15,7 +18,6 @@ setup:
     - uv init
     - uv add -r requirements.txt
   resume_commands:
-    # Create venv and install deps using standard Python (agent uses pip, not uv)
     - python -m venv .venv || true
     - .venv/bin/pip install -r requirements.txt 2>/dev/null || true
 commands:

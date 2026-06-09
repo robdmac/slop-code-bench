@@ -1,10 +1,12 @@
 type: docker
-name: python3.12
+name: python3.12-with-karpathy-codex
 docker:
   image: ghcr.io/astral-sh/uv:python3.12-trixie-slim
   workdir: /workspace
   mount_workspace: true
   mem_limit: 12g
+  extra_mounts:
+    /home/rob/swebench/solution/skill/andrej-karpathy-skills/skills/karpathy-guidelines: /tmp/agent_home/.agents/skills/karpathy-guidelines
 environment:
   env:
     UV_CACHE_DIR: /tmp/uv-cache
@@ -15,7 +17,6 @@ setup:
     - uv init
     - uv add -r requirements.txt
   resume_commands:
-    # Create venv and install deps using standard Python (agent uses pip, not uv)
     - python -m venv .venv || true
     - .venv/bin/pip install -r requirements.txt 2>/dev/null || true
 commands:

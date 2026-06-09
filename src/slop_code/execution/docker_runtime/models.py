@@ -59,6 +59,12 @@ class DockerConfig(BaseModel):
         default=None,
         description="User specifier for docker run (e.g. '1000:1000').",
     )
+    mem_limit: str | None = Field(
+        default="16g",
+        description="Per-container memory cap (docker --memory / mem_limit), "
+        "e.g. '16g'. Bounds a runaway container so it is killed inside its "
+        "container instead of OOM-ing the host. None disables the cap.",
+    )
 
 
 class DockerEnvironmentSpec(EnvironmentSpec):

@@ -10,6 +10,13 @@ ENV PATH="$HOME/.npm-global/bin:$PATH"
 ENV XDG_CONFIG_HOME="$HOME/.config"
 ENV XDG_DATA_HOME="$HOME/.local/share"
 
+# Prevent any version drift: belt-and-suspenders against runtime self-update.
+# (Codex 0.98.0 binary has no self-update mechanism; these guard future versions.)
+ENV CODEX_DISABLE_AUTO_UPGRADE=1
+ENV CODEX_NO_AUTO_UPGRADE=1
+ENV NO_UPDATE_NOTIFIER=1
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+
 # --- Install Codex dependencies --------------------------------------------
 RUN npm install -g @openai/codex@{{ version }} && \
     mkdir -p "$HOME/.codex"
