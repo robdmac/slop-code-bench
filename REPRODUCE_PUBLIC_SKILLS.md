@@ -6,9 +6,10 @@ agent-skill comparison** on SlopCodeBench against **gpt-5.5 via the codex CLI**
 **baseline** (no skill), **GSD**, **OMC**, **SuperPowers**, **Karpathy**.
 
 > Each skill prompt is a *real trigger* that bind-mounts the full plugin into the
-> container and instructs the agent to read it. The earlier **distilled** variants
-> (inline ~28-line summaries that never read the plugin) are archived under
-> `archive/distilled-skill-configs/` — see its README. Do not use those for new runs.
+> container and instructs the agent to read it. An earlier iteration used
+> **distilled** variants (inline ~28-line summaries that never read the plugin);
+> those are superseded and intentionally not on this branch. They remain available
+> in history at commit `c92f1f5` if you need to tie back to the superseded results.
 >
 > The private/in-development skills (Evidence/evidencia, REF, agent-memory) are
 > **not** included here — only the publicly-available skills.
