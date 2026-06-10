@@ -50,7 +50,7 @@ absolute (`/home/rob/swebench/solution/skill/...`); replace with your own.
 | skill | env yaml | host plugin → container mount | prompt reads |
 |---|---|---|---|
 | GSD | `docker-python3.12-uv-with-gsd-real.yaml` | `get-shit-done` → `/tmp/agent_home/.claude/skills/get-shit-done` | `.../get-shit-done/README.md` |
-| OMC | `docker-python3.12-uv-with-omc-real.yaml` | `oh-my-claudecode` → `/tmp/agent_home/.claude/skills/oh-my-claudecode` | `.../oh-my-claudecode/skills/skill/SKILL.md` |
+| OMC | `docker-python3.12-uv-with-omc-real.yaml` | `oh-my-claudecode` → `/tmp/agent_home/.claude/skills/oh-my-claudecode` | `.../oh-my-claudecode/AGENTS.md` |
 | SuperPowers | `docker-python3.12-uv-with-superpowers.yaml` | `superpowers` → `/tmp/agent_home/.claude/skills/superpowers` | `.../superpowers/skills/using-superpowers/SKILL.md` |
 | Karpathy | `docker-python3.12-uv-with-karpathy.yaml` | `andrej-karpathy-skills/skills/karpathy-guidelines` → `/tmp/agent_home/.claude/skills/karpathy-guidelines` | `.../karpathy-guidelines/SKILL.md` |
 
@@ -87,6 +87,15 @@ Skill → (env, prompt) pairs:
 | Karpathy | `docker-python3.12-uv-with-karpathy.yaml` | `just-solve-with-karpathy-trigger.jinja` |
 
 Notes:
+- **OMC entry point** — the OMC trigger reads `AGENTS.md` (OMC's agent-facing
+  orchestration guide), *not* `skills/skill/SKILL.md` (which is OMC's skill-management
+  CLI). Targeting the latter makes the agent burn every checkpoint hunting for the
+  workflow and a subagent-spawn tool the codex sandbox doesn't expose → ~0% (validated
+  failure mode). The trigger also tells the agent to apply OMC's analyst/architect/
+  executor/verifier/reviewer roles as a single-agent sequential pass rather than
+  spawning subagents, since OMC's native multi-agent team tooling isn't available in a
+  single-agent codex run. Lesson for any plugin: target its real entry doc and adapt
+  multi-agent frameworks to single-agent execution.
 - `version=0.136.0` pins the codex CLI version (image built with `@openai/codex@<version>`;
   version-drift disabled — see edits below).
 - `thinking=high` maps to codex `model_reasoning_effort=high`.
