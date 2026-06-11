@@ -154,6 +154,11 @@ class LocalConfig(BaseModel):
     Attributes:
         requires_tty: Hint that processes should be launched with a TTY
         shell: Optional shell executable for setup commands
+        tmux: Mirror streamed output into a tmux window so the run is
+            attachable read-only (see ``execution.tmux_support``)
+        tmux_session: tmux session name holding one window per run
+        tmux_log_dir: Directory for the per-run logfiles tmux tails. When
+            unset, logs live under ``<working_dir>/.scb_tmux``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -165,6 +170,25 @@ class LocalConfig(BaseModel):
     shell: str | None = Field(
         default=None,
         description="Optional shell executable for setup commands.",
+    )
+    tmux: bool = Field(
+        default=False,
+        description=(
+            "Mirror streamed stdout/stderr into a tmux window so an external "
+            "read-only viewer can watch the run live. Fails open: if tmux is "
+            "unavailable the run proceeds exactly as a plain local run."
+        ),
+    )
+    tmux_session: str = Field(
+        default="scb",
+        description="tmux session name that holds one window per run.",
+    )
+    tmux_log_dir: str | None = Field(
+        default=None,
+        description=(
+            "Directory for per-run logfiles that tmux tails. Defaults to "
+            "'<working_dir>/.scb_tmux' when unset."
+        ),
     )
 
 

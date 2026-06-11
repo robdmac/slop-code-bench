@@ -1,0 +1,41 @@
+# Host (no-Docker) skills-variant environment: GSD (Get Shit Done) skill.
+#
+# The Docker variant (docker-python3.12-uv-with-gsd-real.yaml) bind-mounts the
+# skill from a hardcoded host path into the container. On the host runtime
+# there is no mount, so instead a setup command copies the skill from a path
+# given by $SCB_SKILL_GSD_DIR into a workspace-relative `.claude/skills/`
+# directory (which is already in the snapshot ignore-globs, so it never
+# pollutes the solution snapshot).
+#
+# Pair this with the prompt:  just-solve-with-gsd-local-trigger.jinja
+#
+# Setup before running:
+#   git clone https://github.com/open-gsd/get-shit-done-redux ~/skills/get-shit-done
+#   export SCB_SKILL_GSD_DIR=~/skills/get-shit-done
+#
+# Pattern generalises to OMC / SuperPowers / Karpathy: clone the repo, point an
+# SCB_SKILL_<NAME>_DIR env var at it, copy it in via setup.commands, and add a
+# matching *-local-trigger.jinja prompt that references the relative path.
+type: local
+name: python-tmux-with-gsd
+environment:
+  include_os_env: true
+local:
+  tmux: true
+  tmux_session: scb
+setup:
+  commands:
+    # Stage the skill into the run's workspace so the agent (and the trigger
+    # prompt's relative path) can find it. Quietly no-ops if the var is unset.
+    - >-
+      sh -c 'if [ -n "$SCB_SKILL_GSD_DIR" ]; then
+      mkdir -p .claude/skills &&
+      cp -R "$SCB_SKILL_GSD_DIR" .claude/skills/get-shit-done;
+      else echo "warning: SCB_SKILL_GSD_DIR unset; running without GSD skill" >&2; fi'
+  eval_commands:
+    - uv init
+    - uv add -r requirements.txt
+commands:
+  entry_file: "{entry_file}.py"
+  command: "uv run"
+  agent_command: "python"

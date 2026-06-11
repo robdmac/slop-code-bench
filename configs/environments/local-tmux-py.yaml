@@ -1,0 +1,25 @@
+# Host (no-Docker) Python environment with a read-only tmux viewer.
+#
+# Same as local-py.yaml but mirrors each agent run into a tmux window so it
+# can be watched live from a separate pane:
+#
+#     tmux attach -r -t scb:<run>
+#
+# Requires `tmux` on PATH. Fails open: without tmux it behaves like local-py.
+# Designed to run the agent-under-test directly in the Orcabot sandbox VM
+# alongside the orchestrating CLI — no inner container.
+type: local
+name: python-tmux
+environment:
+  include_os_env: true
+local:
+  tmux: true
+  tmux_session: scb
+setup:
+  eval_commands:
+    - uv init
+    - uv add -r requirements.txt
+commands:
+  entry_file: "{entry_file}.py"
+  command: "uv run"
+  agent_command: "python"

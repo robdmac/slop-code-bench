@@ -23,6 +23,7 @@ from slop_code.execution.runtime import RuntimeEvent
 from slop_code.execution.runtime import RuntimeResult
 from slop_code.execution.runtime import SolutionRuntimeError
 from slop_code.execution.stream_processor import process_stream
+from slop_code.execution.tmux_support import TmuxMirror
 from slop_code.logging import get_logger
 
 logger = get_logger(__name__)
@@ -88,6 +89,8 @@ class LocalStreamingRuntime(StreamingRuntime):
         self._is_evaluation = is_evaluation
         self._proc: subprocess.Popen | None = None
         self.cwd = working_dir
+        # Optional read-only tmux mirror (set by spawn() when local.tmux is on).
+        self._tmux: TmuxMirror | None = None
 
     @property
     def process(self) -> subprocess.Popen:
@@ -156,6 +159,11 @@ class LocalStreamingRuntime(StreamingRuntime):
                     if not chunk:
                         sel.unregister(key.fileobj)
                         continue
+                    # Tee to the tmux mirror (read-only viewer) before
+                    # yielding. The harness still receives the original chunk
+                    # unchanged; the mirror only ever observes a copy.
+                    if self._tmux is not None:
+                        self._tmux.write(chunk)
                     if key.data == "OUT":
                         yield (chunk, "")
                     else:
@@ -241,6 +249,8 @@ class LocalStreamingRuntime(StreamingRuntime):
         if self._proc is not None:
             self.kill()
             self._proc.wait(timeout=10)
+        if self._tmux is not None:
+            self._tmux.close()
 
     @classmethod
     def spawn(
@@ -289,6 +299,21 @@ class LocalStreamingRuntime(StreamingRuntime):
             setup_command=setup_command,
             is_evaluation=is_evaluation,
         )
+
+        # Attach a read-only tmux mirror for agent (non-evaluation) runs when
+        # requested. Evaluation runs (pytest etc.) are short and noisy, so we
+        # only mirror the watchable agent session. Fails open.
+        if environment.local.tmux and not is_evaluation:
+            log_dir = (
+                Path(environment.local.tmux_log_dir)
+                if environment.local.tmux_log_dir
+                else working_dir / ".scb_tmux"
+            )
+            runtime._tmux = TmuxMirror.start(
+                session=environment.local.tmux_session,
+                label=working_dir.name,
+                log_dir=log_dir,
+            )
 
         # Run setup commands if not disabled
         if not disable_setup:
