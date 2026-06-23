@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 import shlex
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, Literal
@@ -157,6 +158,20 @@ class OpenCodeAgent(Agent):
                 opencode_config["provider"][provider]["options"]["baseURL"] = (
                     endpoint.api_base
                 )
+            # Inject the API key too: opencode does not fall back to the
+            # provider env var once baseURL is overridden, so without this it
+            # sends no auth header (401). The value may be a broker placeholder
+            # that the secrets broker swaps for the real key server-side.
+            if (
+                credential is not None
+                and credential.credential_type == CredentialType.ENV_VAR
+                and credential.value
+                and "apiKey"
+                not in opencode_config["provider"][provider]["options"]
+            ):
+                opencode_config["provider"][provider]["options"]["apiKey"] = (
+                    credential.value
+                )
 
         # Merge env (agent_specific base, YAML env overrides)
         env = dict(config.env)
@@ -308,6 +323,27 @@ class OpenCodeAgent(Agent):
         }
         return volumes
 
+    def _materialize_local_config(
+        self, volumes: dict[str, dict[str, str]]
+    ) -> None:
+        """Place opencode config/auth/storage on disk for non-Docker runtimes.
+
+        The Docker path delivers these via bind mounts (see ``_get_volumes``);
+        local runtimes ignore ``mounts``, so copy each source to its bind
+        destination (under ``HOME_PATH``) directly. Without this, opencode runs
+        unconfigured -- no provider ``baseURL`` and no credentials -- and fails
+        with 401s.
+        """
+        for src, mount in volumes.items():
+            dest = Path(mount["bind"])
+            src_path = Path(src)
+            if src_path.is_dir():
+                dest.mkdir(parents=True, exist_ok=True)
+            else:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(src_path, dest)
+        self.log.debug("Materialized opencode config for local runtime")
+
     def setup(self, session: Session) -> None:
         self._tmp_dir = tempfile.TemporaryDirectory()
 
@@ -331,8 +367,13 @@ class OpenCodeAgent(Agent):
             env_vars[self.credential.destination_key] = self.credential.value
         # File credentials are handled in _get_volumes()
 
+        volumes = self._get_volumes()
+        # Local (non-Docker) runtimes ignore bind mounts, so write the same
+        # config/auth/storage files to their HOME_PATH destinations on disk.
+        if getattr(session.spec, "type", None) != "docker":
+            self._materialize_local_config(volumes)
         self._runtime = session.spawn(
-            mounts=self._get_volumes(),
+            mounts=volumes,
             env_vars=env_vars,
             disable_setup=True,
             image=self.image,

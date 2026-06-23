@@ -13,5 +13,10 @@ provider_slugs:
 agent_specific:
   opencode:
     provider_name: openrouter
+    # Select the openai-format endpoint so the runner injects its api_base into
+    # opencode's provider.openrouter.options.baseURL. Pointing that endpoint at
+    # the Orcabot broker URL at launch routes opencode through the secrets broker
+    # (placeholder key in, broker injects the real one).
+    endpoint: openai
     provider_name_overrides:
       moonshot: moonshot
