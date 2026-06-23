@@ -143,35 +143,30 @@ class OpenCodeAgent(Agent):
 
         # Inject endpoint api_base into provider config if endpoint is specified
         if endpoint:
-            # Ensure provider config section exists
-            if "provider" not in opencode_config:
-                opencode_config["provider"] = {}
-            if provider not in opencode_config["provider"]:
-                opencode_config["provider"][provider] = {}
-            if "options" not in opencode_config["provider"][provider]:
-                opencode_config["provider"][provider]["options"] = {}
-            # Set baseURL from endpoint if not already set
-            if (
-                "baseURL"
-                not in opencode_config["provider"][provider]["options"]
-            ):
-                opencode_config["provider"][provider]["options"]["baseURL"] = (
-                    endpoint.api_base
-                )
-            # Inject the API key too: opencode does not fall back to the
-            # provider env var once baseURL is overridden, so without this it
-            # sends no auth header (401). The value may be a broker placeholder
-            # that the secrets broker swaps for the real key server-side.
+            # opencode treats a provider id matching a built-in (e.g.
+            # "openrouter") AS that built-in: it ignores options.apiKey/baseURL
+            # and sends NO auth header once the base is overridden (-> 401
+            # "Missing Authentication header" through a proxy/broker). So define
+            # a SYNTHETIC provider id backed by the OpenAI-compatible SDK, which
+            # honors options.baseURL + options.apiKey and sends a Bearer header.
+            # model_slug (resolved above from the real provider) is unchanged;
+            # only the provider id used for the config key + --model changes.
+            oc_provider = f"scb-{provider}"
+            opencode_config.setdefault("provider", {})
+            entry = opencode_config["provider"].setdefault(oc_provider, {})
+            entry["npm"] = "@ai-sdk/openai-compatible"
+            opts = entry.setdefault("options", {})
+            opts.setdefault("baseURL", endpoint.api_base)
             if (
                 credential is not None
                 and credential.credential_type == CredentialType.ENV_VAR
                 and credential.value
-                and "apiKey"
-                not in opencode_config["provider"][provider]["options"]
             ):
-                opencode_config["provider"][provider]["options"]["apiKey"] = (
-                    credential.value
-                )
+                opts.setdefault("apiKey", credential.value)
+            # Expose the model under the synthetic provider too.
+            entry.setdefault("models", {}).setdefault(model_slug, {})
+            # Route the agent + --model string through the synthetic provider.
+            provider = oc_provider
 
         # Merge env (agent_specific base, YAML env overrides)
         env = dict(config.env)

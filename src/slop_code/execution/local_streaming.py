@@ -128,7 +128,12 @@ class LocalStreamingRuntime(StreamingRuntime):
 
         self._proc = subprocess.Popen(
             cmd_args,
-            env=self.spec.get_full_env(env),
+            # Apply the agent's spawn-time env_vars (e.g. HOME, provider keys).
+            # The Docker runtime passes these to the container; locally they must
+            # be merged into the process env too, or agents that rely on HOME
+            # (to find their config) or credential env vars break. Stream-time
+            # env still wins.
+            env=self.spec.get_full_env({**self._env_vars, **env}),
             stdin=None,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
