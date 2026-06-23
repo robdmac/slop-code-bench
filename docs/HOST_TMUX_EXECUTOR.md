@@ -55,6 +55,20 @@ agent process ──stdout/stderr──▶ subprocess pipes ──▶ harness (t
 Because the viewer only tails a file (and attaches with `-r`), it is read-only
 by construction — it cannot send input to or kill the agent.
 
+### Cross-PTY viewing (security)
+
+The tmux window + `tmux attach -r` is for **same-uid** viewing — a human (or the
+orchestrator) in the executor's own shell, using tmux's default per-uid socket.
+
+A **separate viewer process under a different uid** (e.g. an Orcabot viewer pane
+when the egress UID pool is active) must **not** be bridged to this tmux socket:
+making the socket cross-uid-accessible would expose a tmux *control* socket
+(read every pane **and inject commands** into any session), bypassing output
+redaction via a local channel. Cross-uid/cross-PTY viewers should instead
+**`tail -n +1 -F <logfile>`** — read-only, reaching only that one run. The
+`logfile` path is in each `runs.jsonl` record for exactly this purpose. The tmux
+mirror stays private to the executor's uid.
+
 **Fail-open:** if `tmux` isn't on PATH, or any tmux command fails, mirroring
 silently disables and the run proceeds exactly like plain `local-py`. tmux
 problems never fail a benchmark.

@@ -4,9 +4,15 @@ REVISION: host-tmux-executor-v1-mirror
 
 Purpose
 -------
-Make each local (no-Docker) agent run *attachable read-only* so it can be
-watched live from a separate pane — e.g. an Orcabot terminal block whose
-boot command is ``tmux attach -r -t scb:<run>``.
+Make each local (no-Docker) agent run watchable live from a separate pane.
+Two viewing paths, by trust boundary:
+- **same-uid** (a human/orchestrator in the executor's own shell): attach the
+  tmux window read-only, ``tmux attach -r -t scb:<run>``.
+- **cross-PTY / cross-uid** (e.g. an Orcabot viewer pane under the egress UID
+  pool): ``tail -n +1 -F <logfile>`` instead. Bridging the tmux *control*
+  socket across uids would expose read+inject across sessions and bypass output
+  redaction, so the socket stays private to the executor's uid. The ``logfile``
+  for each run is recorded in ``runs.jsonl``. See docs/HOST_TMUX_EXECUTOR.md.
 
 Design
 ------
