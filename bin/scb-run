@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# scb-run — run one slop-code-bench arm deterministically inside an Orcabot VM.
+# Patches the broker URL, launches the harness detached to a logfile, and prints
+# how to watch. No AI in the loop.
+#
+# Usage:
+#   bin/scb-run [--problem NAME]... [--agent A] [--model M]
+#               [--thinking low|medium|high|none] [--evaluate] [--foreground]
+# Defaults reproduce the validated arm: opencode + Kimi K2.6 via OpenRouter,
+# local-tmux env, just-solve prompt, problem file_backup, thinking=low, inference-only.
+#
+# Requires (in a broker-protected Orcabot terminal):
+#   OPENROUTER_API_KEY   the [BROKERED] placeholder (real key injected server-side)
+#   OPENROUTER_BASE_URL  the per-session broker URL
+set -euo pipefail
+
+WS="${SCB_WORKSPACE:-/workspace}"
+REPO_DIR="${SCB_REPO_DIR:-$WS/slop-code-bench}"
+VENV="${SCB_VENV:-$WS/scb-venv}"
+
+AGENT="${SCB_AGENT:-opencode}"
+MODEL="${SCB_MODEL:-openrouter/kimi-k2.6}"
+ENVCFG="${SCB_ENV:-configs/environments/local-tmux-py.yaml}"
+PROMPT="${SCB_PROMPT:-configs/prompts/just-solve.jinja}"
+THINKING="${SCB_THINKING:-low}"
+EVALUATE=0
+FOREGROUND=0
+PROBLEMS=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --problem)    PROBLEMS+=("$2"); shift 2 ;;
+    --agent)      AGENT="$2"; shift 2 ;;
+    --model)      MODEL="$2"; shift 2 ;;
+    --env)        ENVCFG="$2"; shift 2 ;;
+    --prompt)     PROMPT="$2"; shift 2 ;;
+    --thinking)   THINKING="$2"; shift 2 ;;
+    --evaluate)   EVALUATE=1; shift ;;
+    --foreground) FOREGROUND=1; shift ;;
+    -h|--help)    sed -n '2,14p' "$0"; exit 0 ;;
+    *) echo "scb-run: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+[ ${#PROBLEMS[@]} -gt 0 ] || PROBLEMS=(file_backup)
+
+# Preconditions ---------------------------------------------------------------
+if [ ! -x "$VENV/bin/slop-code" ]; then
+  echo "scb-run: $VENV/bin/slop-code missing — run bin/scb-setup first." >&2
+  exit 1
+fi
+: "${OPENROUTER_API_KEY:?scb-run: OPENROUTER_API_KEY not set — add a broker-protected key in the Orcabot secrets panel}"
+: "${OPENROUTER_BASE_URL:?scb-run: OPENROUTER_BASE_URL not set — run this in a brokered Orcabot terminal}"
+
+export HOME="${HOME:-/root}"
+export TMPDIR="${TMPDIR:-$WS/.uvtmp}"
+mkdir -p "$TMPDIR"
+cd "$REPO_DIR"
+
+# Broker URL: opencode (Node/undici) can't reach the IPv4-only broker via
+# "localhost" (it tries IPv6 ::1), so rewrite to 127.0.0.1. Re-patch a pristine
+# copy each run since the broker URL is per-session.
+cp configs/providers.yaml.orig configs/providers.yaml 2>/dev/null || true
+BROKER_URL="$OPENROUTER_BASE_URL" python3 - <<'PY'
+import os
+p = "configs/providers.yaml"
+s = open(p).read()
+url = os.environ["BROKER_URL"].replace("localhost", "127.0.0.1")
+open(p, "w").write(s.replace("api_base: https://openrouter.ai/api/v1", "api_base: " + url))
+PY
+
+# Build the command -----------------------------------------------------------
+CMD=( "$VENV/bin/slop-code" run --agent "$AGENT" --model "$MODEL"
+      --environment "$ENVCFG" --prompt "$PROMPT" )
+for p in "${PROBLEMS[@]}"; do CMD+=( --problem "$p" ); done
+[ "$EVALUATE" -eq 1 ] || CMD+=( --no-evaluate )
+CMD+=( "thinking=$THINKING" )
+
+echo "[scb-run] agent=$AGENT model=$MODEL problems=${PROBLEMS[*]} thinking=$THINKING evaluate=$EVALUATE"
+
+if [ "$FOREGROUND" -eq 1 ]; then
+  exec "${CMD[@]}"
+fi
+
+# Detached: survive the launching shell, tee to a logfile the job component tails.
+LOG="$WS/.scb-run.$(date +%Y%m%dT%H%M%S).log"
+ln -sf "$LOG" "$WS/.scb-run.log"   # stable "latest" pointer for viewers
+setsid "${CMD[@]}" >"$LOG" 2>&1 </dev/null &
+echo "[scb-run] launched pid=$!"
+echo "[scb-run] log:   $LOG  (latest: $WS/.scb-run.log)"
+echo "[scb-run] watch: tail -f $WS/.scb-run.log"

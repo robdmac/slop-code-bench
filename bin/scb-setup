@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# scb-setup — deterministic, idempotent setup for running slop-code-bench inside
+# an Orcabot sandbox VM. No AI in the loop. Safe to re-run.
+#
+# Targets /workspace (the host-shared / Fly-volume dir that survives reboots), so
+# the venv + caches persist while the rootfs is ephemeral. Run it from anywhere:
+#   curl -fsSL <raw>/bin/scb-setup | bash         # bootstrap (clones the fork)
+#   bin/scb-setup                                  # from an existing checkout
+#
+# Env overrides (all optional):
+#   SCB_WORKSPACE   base dir (default /workspace)
+#   SCB_REPO_DIR    fork checkout   (default $SCB_WORKSPACE/slop-code-bench)
+#   SCB_VENV        venv dir        (default $SCB_WORKSPACE/scb-venv)
+#   SCB_PYTHON      python version  (default 3.12 — 3.14 has no wheels; VM has no compiler)
+#   SCB_REPO_URL    git remote      (default robdmac fork)
+#   SCB_REPO_BRANCH branch          (default feat/host-tmux-executor)
+set -euo pipefail
+
+WS="${SCB_WORKSPACE:-/workspace}"
+REPO_DIR="${SCB_REPO_DIR:-$WS/slop-code-bench}"
+VENV="${SCB_VENV:-$WS/scb-venv}"
+PYVER="${SCB_PYTHON:-3.12}"
+REPO_URL="${SCB_REPO_URL:-https://github.com/robdmac/slop-code-bench}"
+REPO_BRANCH="${SCB_REPO_BRANCH:-feat/host-tmux-executor}"
+
+# Keep uv's managed python, cache, and tmp on /workspace so they survive reboots
+# and don't fill the small rootfs.
+export UV_PYTHON_INSTALL_DIR="$WS/.uv-python"
+export UV_CACHE_DIR="$WS/.uv-cache"
+export UV_PROJECT_ENVIRONMENT="$VENV"
+export TMPDIR="$WS/.uvtmp"
+mkdir -p "$TMPDIR"
+
+log() { printf '\n[scb-setup] %s\n' "$*"; }
+
+# 1. Ensure the fork checkout exists. scb-setup usually ships inside it, but when
+#    bootstrapped via curl|bash it clones first.
+if [ ! -e "$REPO_DIR/pyproject.toml" ]; then
+  log "cloning $REPO_URL@$REPO_BRANCH -> $REPO_DIR"
+  git clone --branch "$REPO_BRANCH" --depth 1 "$REPO_URL" "$REPO_DIR"
+fi
+cd "$REPO_DIR"
+
+# 2. Ensure uv is available. The rootfs wipes /root/.local/bin on reboot, but the
+#    heavy bits (python, wheels) are cached on /workspace, so re-install is fast.
+if ! command -v uv >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/uv" ]; then
+  log "installing uv"
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+UV="$(command -v uv 2>/dev/null || echo "$HOME/.local/bin/uv")"
+
+# 3. Sync the venv + deps (idempotent — a no-op when already up to date).
+log "uv sync (python $PYVER) -> $VENV"
+"$UV" sync --python "$PYVER"
+
+# 4. Preserve a pristine providers.yaml so each run can re-patch a clean copy with
+#    the current session's broker URL (scb-run does the patch).
+if [ -f configs/providers.yaml ] && [ ! -f configs/providers.yaml.orig ]; then
+  cp configs/providers.yaml configs/providers.yaml.orig
+  log "saved configs/providers.yaml.orig"
+fi
+
+# 5. Sanity check.
+if "$VENV/bin/slop-code" --help >/dev/null 2>&1; then
+  log "slop-code OK"
+else
+  log "ERROR: $VENV/bin/slop-code is not runnable"
+  exit 1
+fi
+
+log "setup complete."
+log "  repo: $REPO_DIR"
+log "  venv: $VENV"
+log "next: $REPO_DIR/bin/scb-run --problem file_backup"
