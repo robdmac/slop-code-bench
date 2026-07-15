@@ -1,0 +1,25 @@
+internal_name: gpt-5.5-codex
+provider: openai
+provider_slugs:
+  openai-codex: gpt-5.5-codex
+
+# Codex CLI native model. Drive via `--agent codex --model gpt-5.5-codex`.
+# With scb-matrix `codex_auth: subscription` the openai provider is flipped to a
+# file credential (~/.codex/auth.json) so this runs on a ChatGPT/Codex subscription
+# (no per-token API key). For API-key/OpenRouter routing instead, use the broker.
+agent_specific:
+  opencode:
+    provider_name: openai
+    model: gpt-5.5-codex
+    thinking_enabled: true
+    config:
+      "$schema": "https://opencode.ai/config.json"
+
+# NOTE: pricing is a placeholder (mirrors gpt-5.3-codex) — update with the real
+# gpt-5.5-codex rates. On a subscription the $ cost is flat-rate/covered; this only
+# affects the notional cost slop-code computes when the CLI doesn't report one.
+pricing:
+  input: 1.75
+  output: 14.00
+  cache_read: 0.175
+  cache_write: 0
