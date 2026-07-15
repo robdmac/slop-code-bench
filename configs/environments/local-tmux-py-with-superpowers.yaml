@@ -1,0 +1,36 @@
+# Host (no-Docker) skills-variant environment: SuperPowers skill.
+#
+# The Docker variant bind-mounts the skill from a hardcoded host path into the
+# container. On the host runtime there is no mount, so instead a setup command
+# copies the skill from a path given by $SCB_SKILL_SUPERPOWERS_DIR into a workspace-relative
+# `.claude/skills/` directory (already in the snapshot ignore-globs, so it never
+# pollutes the solution snapshot).
+#
+# Pair this with the prompt:  just-solve-with-superpowers-local-trigger.jinja
+#
+# Setup before running (scb-matrix does this automatically):
+#   git clone <repo> ~/skills/superpowers
+#   export SCB_SKILL_SUPERPOWERS_DIR=~/skills/superpowers
+type: local
+name: python-tmux-with-superpowers
+environment:
+  include_os_env: true
+local:
+  tmux: true
+  tmux_session: scb
+setup:
+  commands:
+    # Stage the skill into the run's workspace so the agent (and the trigger
+    # prompt's relative path) can find it. Quietly no-ops if the var is unset.
+    - >-
+      sh -c 'if [ -n "$SCB_SKILL_SUPERPOWERS_DIR" ]; then
+      mkdir -p .claude/skills &&
+      cp -R "$SCB_SKILL_SUPERPOWERS_DIR" .claude/skills/superpowers;
+      else echo "warning: SCB_SKILL_SUPERPOWERS_DIR unset; running without SuperPowers skill" >&2; fi'
+  eval_commands:
+    - uv init
+    - uv add -r requirements.txt
+commands:
+  entry_file: "{entry_file}.py"
+  command: "uv run"
+  agent_command: "python"
