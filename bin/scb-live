@@ -36,63 +36,92 @@ PROG = re.compile(
 )
 
 
-def latest_log():
-    logs = sorted(glob.glob(f"{WS}/.scb-run.2*.log"), key=os.path.getmtime)
-    return logs[-1] if logs else None
+ARM_RE = re.compile(r"\[scb-matrix\] arm (\S+) x (\S+)")
+TS_RE = re.compile(r"\.(\d{8}T\d{6})\.log$")
 
 
-def parse(logpath):
-    """Return (per-problem latest progress dict, last raw log lines)."""
+def batch_logs():
+    """All logs from the LATEST run batch. scb-matrix stamps every arm's logfile
+    with one shared timestamp, so grouping by that timestamp shows the whole matrix
+    (and a single scb-run is just a 1-log batch)."""
+    logs = glob.glob(f"{WS}/.scb-run.*.log")
+    by_ts = {}
+    for p in logs:
+        m = TS_RE.search(p)
+        by_ts.setdefault(m.group(1) if m else "00000000T000000", []).append(p)
+    if not by_ts:
+        return None, []
+    latest = max(by_ts)
+    return latest, sorted(by_ts[latest], key=os.path.getmtime)
+
+
+def arm_label(logpath, raw):
+    m = ARM_RE.search(raw)
+    if m:
+        return f"{m.group(1)} · {m.group(2)}"
+    base = re.sub(r"^\.scb-run\.|\.\d{8}T\d{6}\.log$|\.log$", "", os.path.basename(logpath))
+    return base or "run"
+
+
+def parse_log(logpath):
+    """Return (arm label, {problem: latest progress}, tail lines) for one arm log."""
     with open(logpath, errors="replace") as fh:
         raw = fh.read()
     flat = re.sub(r"\s+", " ", raw)
     problems = {}
     for m in PROG.finditer(flat):
         d = m.groupdict()
-        problems[d["problem"]] = d  # keep the latest per problem (file order)
-    tail = raw.splitlines()[-24:]
-    return problems, tail
+        problems[d["problem"]] = d
+    return arm_label(logpath, raw), problems, raw.splitlines()[-12:]
 
 
 def render():
-    logpath = latest_log()
     now = time.strftime("%H:%M:%S")
-    if not logpath:
-        body = "<p class='muted'>No run yet. Launch one with <code>scb-run</code>.</p>"
+    ts, logs = batch_logs()
+    if not logs:
+        body = "<p class='muted'>No run yet. Launch one with <code>scb-matrix</code> or <code>scb-run</code>.</p>"
         return page(body, "idle", now)
 
-    problems, tail = parse(logpath)
-    total_cost = sum(float(p["cost"]) for p in problems.values())
-    any_running = any(p["state"] == "running" for p in problems.values())
-    overall = "running" if any_running else ("done" if problems else "starting")
-    max_elapsed = max((float(p["elapsed"]) for p in problems.values()), default=0.0)
-
-    rows = []
-    for name, p in sorted(problems.items()):
-        dot = "🟢" if p["state"] == "running" else "⚪"
-        rows.append(
-            f"<tr><td>{dot} {html.escape(name)}</td>"
-            f"<td>{html.escape(p['cp'])}</td>"
-            f"<td class='num'>{p['steps']}/{p['total']}</td>"
-            f"<td class='num'>${float(p['cost']):.4f}</td>"
-            f"<td>{html.escape(p['state'])}</td></tr>"
-        )
+    total_cost, max_elapsed, any_running, any_prog = 0.0, 0.0, False, False
+    rows, tail = [], []
+    multi = len(logs) > 1
+    for logpath in logs:
+        arm, problems, t = parse_log(logpath)
+        tail = t  # newest-updated arm's tail (logs sorted by mtime)
+        for name, p in sorted(problems.items()):
+            any_prog = True
+            total_cost += float(p["cost"])
+            max_elapsed = max(max_elapsed, float(p["elapsed"]))
+            if p["state"] == "running":
+                any_running = True
+            dot = "🟢" if p["state"] == "running" else "⚪"
+            arm_cell = f"<td>{html.escape(arm)}</td>" if multi else ""
+            rows.append(
+                f"<tr>{arm_cell}<td>{dot} {html.escape(name)}</td>"
+                f"<td>{html.escape(p['cp'])}</td>"
+                f"<td class='num'>{p['steps']}/{p['total']}</td>"
+                f"<td class='num'>${float(p['cost']):.4f}</td>"
+                f"<td>{html.escape(p['state'])}</td></tr>"
+            )
+    overall = "running" if any_running else ("done" if any_prog else "starting")
+    ncols = 6 if multi else 5
+    arm_th = "<th>arm</th>" if multi else ""
     table = (
-        "<table><thead><tr><th>problem</th><th>checkpoint</th><th>steps</th>"
+        f"<table><thead><tr>{arm_th}<th>problem</th><th>checkpoint</th><th>steps</th>"
         "<th>cost</th><th>state</th></tr></thead><tbody>"
-        + ("".join(rows) or "<tr><td colspan=5 class='muted'>waiting for first progress…</td></tr>")
+        + ("".join(rows) or f"<tr><td colspan={ncols} class='muted'>waiting for first progress…</td></tr>")
         + "</tbody></table>"
     )
     tally = (
-        f"<div class='tally'><span><b>{len(problems)}</b> problem(s)</span>"
+        f"<div class='tally'><span><b>{len(logs)}</b> arm(s)</span>"
         f"<span>total <b>${total_cost:.4f}</b></span>"
         f"<span>elapsed <b>{max_elapsed:.0f}s</b></span>"
         f"<span class='state-{overall}'>{overall.upper()}</span></div>"
     )
     log = "<pre class='log'>" + html.escape("\n".join(tail)) + "</pre>"
     body = (
-        f"<p class='muted'>run log: {html.escape(os.path.basename(logpath))}</p>"
-        + tally + table + "<h2>activity</h2>" + log
+        f"<p class='muted'>batch {html.escape(ts)} · {len(logs)} arm(s)</p>"
+        + tally + table + "<h2>activity (latest arm)</h2>" + log
     )
     return page(body, overall, now)
 
