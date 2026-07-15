@@ -15,6 +15,7 @@ environment:
 local:
   tmux: true
   tmux_session: scb
+  tmux_log_dir: /workspace/slop-code-bench/.scb_tmux
 setup:
   eval_commands:
     - uv init
