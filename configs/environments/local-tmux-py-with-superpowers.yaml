@@ -18,6 +18,10 @@ environment:
 local:
   tmux: true
   tmux_session: scb
+  # Static (not patched at runtime): the benchmark runs `scb-visualize watch`,
+  # which never calls prepare_configs — only `run` mode does. Without this the
+  # manifest lands in a temp dir and this arm surfaces no viewer.
+  tmux_log_dir: /workspace/slop-code-bench/.scb_tmux
 setup:
   commands:
     # Stage the skill into the run's workspace so the agent (and the trigger
