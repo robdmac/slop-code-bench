@@ -1,7 +1,25 @@
 internal_name: gpt-5.5
 provider: openai
+provider_slugs:
+  openai-codex: gpt-5.5
+
+# Codex CLI on a ChatGPT/Codex SUBSCRIPTION. Use `--agent codex --model openai/gpt-5.5`.
+# NOTE: the "*-codex" model variants (gpt-5.5-codex, gpt-5.3-codex, ...) are API-key
+# only — codex rejects them with "The 'gpt-5.5-codex' model is not supported when
+# using Codex with a ChatGPT account." Plain gpt-5.5 is the subscription model, and is
+# what the SWE-bench Pro reproduce-public-skills harness uses (MODEL="gpt-5.5").
+agent_specific:
+  opencode:
+    provider_name: openai
+    model: gpt-5.5
+    thinking_enabled: true
+    config:
+      "$schema": "https://opencode.ai/config.json"
+
+# Notional only — on a subscription the tokens are covered by the plan. Kept non-zero
+# so the live tally still shows progress (cost>0 is the "reached the model" signal).
 pricing:
-  input: 5.00
-  output: 30.00
-  cache_read: 0.5
+  input: 1.75
+  output: 14.00
+  cache_read: 0.175
   cache_write: 0
