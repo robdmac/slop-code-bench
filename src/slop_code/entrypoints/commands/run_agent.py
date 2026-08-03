@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 from typing import cast
@@ -577,6 +578,26 @@ def _preview_dry_run(
     )
 
 
+def _atomic_yaml_dump(path: Path, data: object) -> None:
+    """Write YAML to ``path`` atomically.
+
+    Dumps to a temp file in the same directory, fsyncs, then ``os.replace()``.
+    A kill or OOM mid-write then leaves either the old file or the complete new
+    one, never a truncated partial (which pytest/OmegaConf later fail to parse
+    with a "could not find expected ':'" scanner error).
+    """
+    tmp = path.with_name(f".{path.name}.tmp.{os.getpid()}")
+    try:
+        with tmp.open("w") as f:
+            yaml.dump(data, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
 def _prepare_run_artifacts(
     run_dir: Path,
     env_spec: EnvironmentSpecType,
@@ -595,15 +616,16 @@ def _prepare_run_artifacts(
     Returns:
         Docker image name (empty string if not using Docker)
     """
-    # Save environment and config to run directory
-    with (run_dir / ENV_CONFIG_NAME).open("w") as f:
-        yaml.dump(serialize_path_dict(env_spec.model_dump(mode="json")), f)
-
-    with (run_dir / CONFIG_FILENAME).open("w") as f:
-        yaml.dump(
-            serialize_path_dict(run_cfg.model_dump(mode="json")),
-            f,
-        )
+    # Save environment and config to run directory (atomic: a partial write here
+    # leaves a truncated config.yaml that fails every downstream eval for the run).
+    _atomic_yaml_dump(
+        run_dir / ENV_CONFIG_NAME,
+        serialize_path_dict(env_spec.model_dump(mode="json")),
+    )
+    _atomic_yaml_dump(
+        run_dir / CONFIG_FILENAME,
+        serialize_path_dict(run_cfg.model_dump(mode="json")),
+    )
     problem_catalog.save_run_catalog_manifest(run_dir, catalog_manifest)
 
     # Build docker image if needed
